@@ -20,9 +20,9 @@ Contents
 
 ui.R and server.R - code for the the wordPredict app  
 
-index.R - a script to create an index (a file called "predictors" is required by the app and spotTest.R  
+index.R - a script to create an index (a file called "predictors" is required by the app and spotTest.R)  
 
-spotTest.R - example uses of the index and predictNextWor function  
+spotTest.R - example uses of the index and predictNextWord function  
 
 mylib.R - functions required for the wordPredict app (ui.R and server.R), index.R and spotTest.R - includes the function predictNextWord
 
