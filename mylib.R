@@ -1,7 +1,9 @@
 # makeSampleFile
 # Given a path to a text file (fileIn), n lines will be randomly sampled and written to a file (fileOut, default=sample.txt).
 # Alternatively a sampling rate (sr, in the range 0:1) can be specified instead of n number of lines.
-makeSampleFile <- function(fileIn, fileOut=sample, sr, n=1){
+# Lines not chosen for the sample are all written to a second file (fileOut2, default=notSample.txt) so they can be later used
+#for validation or testing
+makeSampleFile <- function(fileIn, fileOut="sample.txt", fileOut2="notSample.txt", sr, n=1){
   #prep
   if (is.null(sr)) {
     cmd <- paste("wc -l", fileIn)  
@@ -10,17 +12,21 @@ makeSampleFile <- function(fileIn, fileOut=sample, sr, n=1){
   }
   fi <- file(description=fileIn, open="r")
   fo <- file(description=fileOut, open="w")
+  fo2 <- file(description=fileOut2, open="w")
   
   #do it
   thisLine <- readLines(con=fi, n=1)
   while (length(thisLine) != 0) {
     if (rbinom(1,1,sr)){
       writeLines(thisLine, con=fo)
+    } else {
+      writeLines(thisLine, con=fo2)
     }
     thisLine <- readLines(con=fi, n=1)
   }
   close(fi)
   close(fo)
+  close(fo2)
 }
 
 # preProcessFile
@@ -51,7 +57,11 @@ preProcessFile <- function(fileIn, fileOut) {
 preProcessLine <- function(thisLine) {
   
   #initial clean up and establish sentence/line boundaries 
-  thisLine <- gsub(pattern="(\")", replacement=" ", x=thisLine) #remove quotes
+  thisLine <- gsub(pattern="(\")", replacement=" ", x=thisLine) #remove double quotes
+  thisLine <- gsub(pattern="\u2019", replacement="'", x=thisLine) #replace troublesome u2019 quote with regular straight quote
+  thisLine <- gsub(pattern="(^|\\W)'", replacement="\\1 ", x=thisLine) #remove single quotes preceded by non-word characters or beginning of line
+  thisLine <- gsub(pattern="'(\\W|$)", replacement=" \\1", x=thisLine) #remove single quotes succeded by non-word characters or end of line
+  
   thisLine <- gsub(pattern="(^[^A-Za-z]*)", replacement=" ", x=thisLine) #remove non word characters at beginning
   thisLine <- gsub(pattern="([\\.\\?\\!]{0,1})[^A-Za-z0-9]*$", replacement="\\1", x=thisLine) #remove non word characters at end
   thisLine <- gsub(pattern="([^\\.\\?\\!]$)", replacement="\\1 _lineEnd_", x=thisLine) #add a lineEnd if no .!?
@@ -80,7 +90,7 @@ preProcessLine <- function(thisLine) {
   thisLine <- gsub(pattern=" \\d+\\.\\d ", replacement=" _float_ ", x=thisLine) # = recognize floats
   thisLine <- gsub(pattern="\\(|\\)|\\{|\\}|\\[|\\]", replacement=" ", x=thisLine) #remove braces
   thisLine <- gsub(pattern="\\^", replacement=" ", x=thisLine) #remove hats
-  thisLine <- gsub(pattern="[^([:alnum:]|_|']", replacement=" ", x=thisLine) ##remove all remaining punctuation and non-word characters except _ and '    
+  thisLine <- gsub(pattern="[^[:alnum:]|_|'|\u2019]", replacement=" ", x=thisLine) ##remove all remaining punctuation and non-word characters except _ and '    
   
   #lastly, remove any double spaces
   thisLine <- gsub(pattern="\\s{2,}", replacement=" ", x=thisLine)
@@ -214,7 +224,7 @@ getNextGramMap <- function(p2t, t2p){
     
     #add to a gram2pos hash - the end position of the gram is used to record its position
     for (i in 1:length(grams)) {
-  
+      
       if (has.key(grams[i], gram2pos)){
         gram2pos[ grams[i] ] <- c(gram2pos[[ grams[i] ]], nextPositions[i])
       } 
@@ -265,11 +275,14 @@ gramAnalysis <- function(t2p){
 
 
 predictNextWord <- function(inputString, cutoff=5, all=FALSE) {
-  iSay <- data.frame(matrix(vector(), 0, 2), stringsAsFactors=F)
+  
+  #set up the dataframe of possible results and the default answer
+  iSay <- data.frame(matrix(vector(), 0, 2), stringsAsFactors=FALSE)
   colnames(iSay) <- c("next", "freq")
+  defaultAns <- as.data.frame(list("the", (cutoff + 1) ), stringsAsFactors=FALSE)
+  colnames(defaultAns) <- c("next", "freq")
   
-  
-  #prepare the query
+  #prepare the query from the inputString
   len <- length(inputString)
   if (len == 0){
     return("Try typing something.")
@@ -295,7 +308,7 @@ predictNextWord <- function(inputString, cutoff=5, all=FALSE) {
     }
   }
   iSay
-
+  
   if (sum(is.na(tail(inputVector,3)))==0){
     youSay <- paste(tail(inputVector,3), collapse=" ")
     possible <- trigramPredictors.df[trigramPredictors.df$trigrams==youSay, 4:5]   
@@ -305,7 +318,7 @@ predictNextWord <- function(inputString, cutoff=5, all=FALSE) {
     }
   }
   iSay
-
+  
   
   if (sum(is.na(tail(inputVector,2)))==0){
     youSay <- paste(tail(inputVector,2), collapse=" ")
@@ -318,6 +331,7 @@ predictNextWord <- function(inputString, cutoff=5, all=FALSE) {
   iSay
   
   
+  
   if (sum(is.na(tail(inputVector,1)))==0){
     youSay <- paste(tail(inputVector,1), collapse=" ")
     possible <- unigramPredictors.df[unigramPredictors.df[,1]==youSay, 2:3]  
@@ -328,10 +342,9 @@ predictNextWord <- function(inputString, cutoff=5, all=FALSE) {
   }
   iSay
   
-  #add the default word
-  possible <- c("the", (cutoff + 1))             
-  iSay <- rbind(iSay, possible)
-  colnames(iSay) <- c("next", "freq")
+  #add the default answer last
+  iSay <- rbind(iSay, defaultAns[1,]) 
+  
   
   #select the best word - the word that was predicted by the longest ngram and meets the cutoff 
   iSay$freq <- as.integer(iSay$freq)
@@ -412,8 +425,10 @@ predictNextWord2 <- function(inputVector, cutoff=5, all=FALSE) {
 
 
 testFunction <- function(){
-  x<-"the test function in mylib.R worked"
+  x<-list("a"=1,"b"=2)
   return(x)
+  
 }
+
 
 
