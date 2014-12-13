@@ -106,6 +106,111 @@ preProcessLine <- function(thisLine) {
 
 
 
+
+
+
+
+
+predictNextWord <- function(inputString, cutoff=5, all=FALSE) {
+  
+  #set up the dataframe of possible results and the default answer
+  iSay <- data.frame(matrix(vector(), 0, 2), stringsAsFactors=FALSE)
+  colnames(iSay) <- c("next", "freq")
+  defaultAns <- as.data.frame(list("the", (cutoff + 1) ), stringsAsFactors=FALSE)
+  colnames(defaultAns) <- c("next", "freq")
+  
+  #prepare the query from the inputString
+  len <- length(inputString)
+  if (len == 0){
+    return("Try typing something.")
+  }
+  #preprocess the input in the same way the corpus was preprocessed - remove the _lineend_ introduced by preProcessLne
+  inputString <- preProcessLine(inputString)
+  inputString <- gsub(pattern="_lineend_", replacement="", x=inputString) 
+  #split
+  inputVector <- unlist(strsplit(inputString, split="[[:space:]]"))
+  len <- length(inputVector)
+  #check
+  if (len == 0){
+    return("Try typing something else with words in it.")
+  }
+  
+  #if the last 4 words of the input phrase are defined, use them to predict the next word using quadragramPredictors
+  if (sum(is.na(tail(inputVector,4)))==0){
+    youSay <- paste(tail(inputVector,4), collapse=" ")
+    possible <- quadragramPredictors.df[quadragramPredictors.df$quadragrams==youSay, 5:6]  
+    if (length(possible) > 0){
+      colnames(possible) <- c("next", "freq")
+      iSay <- rbind(iSay, possible)
+    }
+  }
+  iSay
+  
+  if (sum(is.na(tail(inputVector,3)))==0){
+    youSay <- paste(tail(inputVector,3), collapse=" ")
+    possible <- trigramPredictors.df[trigramPredictors.df$trigrams==youSay, 4:5]   
+    if (length(possible) > 0){
+      colnames(possible) <- c("next", "freq")
+      iSay <- rbind(iSay, possible)
+    }
+  }
+  iSay
+  
+  
+  if (sum(is.na(tail(inputVector,2)))==0){
+    youSay <- paste(tail(inputVector,2), collapse=" ")
+    possible <- bigramPredictors.df[bigramPredictors.df$bigrams==youSay, 3:4] 
+    if (length(possible) > 0){
+      colnames(possible) <- c("next", "freq")
+      iSay <- rbind(iSay, possible)
+    }
+  }
+  iSay
+  
+  
+  
+  if (sum(is.na(tail(inputVector,1)))==0){
+    youSay <- paste(tail(inputVector,1), collapse=" ")
+    possible <- unigramPredictors.df[unigramPredictors.df[,1]==youSay, 2:3]  
+    if (length(possible) > 0){
+      colnames(possible) <- c("next", "freq")
+      iSay <- rbind(iSay, possible)
+    }
+  }
+  iSay
+  
+  #add the default answer last
+  iSay <- rbind(iSay, defaultAns[1,]) 
+  
+  
+  #select the best word - the word that was predicted by the longest ngram and meets the cutoff 
+  iSay$freq <- as.integer(iSay$freq)
+  predict <- iSay[which(iSay$freq > cutoff)[1], 1]
+  
+  if (all == TRUE){
+    return(iSay)
+  } else {
+    return(predict)
+  }  
+}
+
+
+
+
+
+
+
+testFunction <- function(){
+  x<-list("a"=1,"b"=2)
+  return(x)
+  
+}
+
+#####################FODDER#####################
+#useful code that was deprecated
+
+
+
 # makeHashMaps
 # Given a test file (fileIn), create two hash maps.  
 # p2t positions2tokens is a hash map of the entire text 
@@ -270,165 +375,3 @@ gramAnalysis <- function(t2p){
   return(list("gramFreqs"=gramFreqs, "grams.df"=grams.df, "nt90"=nt90, "pt90"=pt90))
   
 }
-
-
-
-
-predictNextWord <- function(inputString, cutoff=5, all=FALSE) {
-  
-  #set up the dataframe of possible results and the default answer
-  iSay <- data.frame(matrix(vector(), 0, 2), stringsAsFactors=FALSE)
-  colnames(iSay) <- c("next", "freq")
-  defaultAns <- as.data.frame(list("the", (cutoff + 1) ), stringsAsFactors=FALSE)
-  colnames(defaultAns) <- c("next", "freq")
-  
-  #prepare the query from the inputString
-  len <- length(inputString)
-  if (len == 0){
-    return("Try typing something.")
-  }
-  #preprocess the input in the same way the corpus was preprocessed - remove the _lineend_ introduced by preProcessLne
-  inputString <- preProcessLine(inputString)
-  inputString <- gsub(pattern="_lineend_", replacement="", x=inputString) 
-  #split
-  inputVector <- unlist(strsplit(inputString, split="[[:space:]]"))
-  len <- length(inputVector)
-  #check
-  if (len == 0){
-    return("Try typing something else with words in it.")
-  }
-  
-  #if the last 4 words of the input phrase are defined, use them to predict the next word using quadragramPredictors
-  if (sum(is.na(tail(inputVector,4)))==0){
-    youSay <- paste(tail(inputVector,4), collapse=" ")
-    possible <- quadragramPredictors.df[quadragramPredictors.df$quadragrams==youSay, 5:6]  
-    if (length(possible) > 0){
-      colnames(possible) <- c("next", "freq")
-      iSay <- rbind(iSay, possible)
-    }
-  }
-  iSay
-  
-  if (sum(is.na(tail(inputVector,3)))==0){
-    youSay <- paste(tail(inputVector,3), collapse=" ")
-    possible <- trigramPredictors.df[trigramPredictors.df$trigrams==youSay, 4:5]   
-    if (length(possible) > 0){
-      colnames(possible) <- c("next", "freq")
-      iSay <- rbind(iSay, possible)
-    }
-  }
-  iSay
-  
-  
-  if (sum(is.na(tail(inputVector,2)))==0){
-    youSay <- paste(tail(inputVector,2), collapse=" ")
-    possible <- bigramPredictors.df[bigramPredictors.df$bigrams==youSay, 3:4] 
-    if (length(possible) > 0){
-      colnames(possible) <- c("next", "freq")
-      iSay <- rbind(iSay, possible)
-    }
-  }
-  iSay
-  
-  
-  
-  if (sum(is.na(tail(inputVector,1)))==0){
-    youSay <- paste(tail(inputVector,1), collapse=" ")
-    possible <- unigramPredictors.df[unigramPredictors.df[,1]==youSay, 2:3]  
-    if (length(possible) > 0){
-      colnames(possible) <- c("next", "freq")
-      iSay <- rbind(iSay, possible)
-    }
-  }
-  iSay
-  
-  #add the default answer last
-  iSay <- rbind(iSay, defaultAns[1,]) 
-  
-  
-  #select the best word - the word that was predicted by the longest ngram and meets the cutoff 
-  iSay$freq <- as.integer(iSay$freq)
-  predict <- iSay[which(iSay$freq > cutoff)[1], 1]
-  
-  if (all == TRUE){
-    return(iSay)
-  } else {
-    return(predict)
-  }  
-}
-
-
-
-predictNextWord2 <- function(inputVector, cutoff=5, all=FALSE) {
-  iSay <- data.frame(matrix(vector(), 0, 2), stringsAsFactors=F)
-  colnames(iSay) <- c("next", "freq")
-  
-  if (sum(is.na(tail(inputVector,4)))==0){
-    youSay <- tail(inputVector,4)
-    possible <- quadragramPredictors.df[quadragramPredictors.df$tokens1==youSay[1] & 
-                                          quadragramPredictors.df$tokens2==youSay[2] & 
-                                          quadragramPredictors.df$tokens3==youSay[3] & 
-                                          quadragramPredictors.df$tokens4==youSay[4], 5:6]  
-    if (length(possible) > 0){
-      colnames(possible) <- c("next", "freq")
-      iSay <- rbind(iSay, possible)
-    }
-  }
-  iSay
-  
-  
-  if (length(youSay) > 2) {
-    possible <- trigramPredictors.df[trigramPredictors.df$tokens1==youSay[1] & 
-                                       trigramPredictors.df$tokens2==youSay[2] & 
-                                       trigramPredictors.df$tokens3==youSay[3], 4:5]  
-    if (length(possible) > 0){
-      colnames(possible) <- c("next", "freq")
-      iSay <- rbind(iSay, possible)
-    }
-  }
-  iSay
-  
-  if (length(youSay) > 1) {
-    possible <- bigramPredictors.df[bigramPredictors.df$tokens1==youSay[1] & 
-                                      bigramPredictors.df$tokens2==youSay[2], 3:4]  
-    if (length(possible) > 0){
-      colnames(possible) <- c("next", "freq")
-      iSay <- rbind(iSay, possible)
-    }
-  }
-  iSay
-  
-  
-  if (length(youSay) > 0) {
-    possible <- unigramPredictors.df[unigramPredictors.df$tokens1==youSay[1], 2:3]  
-    if (length(possible) > 0){
-      colnames(possible) <- c("next", "freq")
-      iSay <- rbind(iSay, possible)
-    }
-  }
-  iSay
-  
-  #add the default word
-  iSay <- rbind(iSay, c("the", (cutoff + 1)))
-  
-  #select the best word - the word that was predicted by the longest ngram and meets the cutoff 
-  iSay$freq <- as.integer(iSay$freq)
-  predict <- iSay[which(iSay$freq > cutoff)[1], 1]
-  
-  if (all == TRUE){
-    return(iSay)
-  } else {
-    return(predict)
-  }  
-}
-
-
-
-testFunction <- function(){
-  x<-list("a"=1,"b"=2)
-  return(x)
-  
-}
-
-
-
